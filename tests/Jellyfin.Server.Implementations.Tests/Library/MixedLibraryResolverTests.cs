@@ -205,6 +205,46 @@ namespace Jellyfin.Server.Implementations.Tests.Library
             Assert.IsType<Movie>(result);
         }
 
+        [Fact]
+        public void MovieResolver_MovieFolderWithSampleSubfolder_ResolvesToMovie()
+        {
+            var libraryManager = new Mock<ILibraryManager>();
+            libraryManager.Setup(m => m.GetLibraryOptions(It.IsAny<BaseItem>())).Returns(new LibraryOptions());
+            libraryManager.Setup(m => m.IgnoreFile(It.IsAny<FileSystemMetadata>(), It.IsAny<BaseItem>())).Returns(false);
+
+            var resolver = new MovieResolver(Mock.Of<IImageProcessor>(), Mock.Of<ILogger<MovieResolver>>(), _namingOptions, Mock.Of<IDirectoryService>(), _videoListResolver);
+            var args = new ItemResolveArgs(
+                Mock.Of<IServerApplicationPaths>(),
+                libraryManager.Object)
+            {
+                Parent = new Folder(),
+                CollectionType = CollectionType.mixed,
+                FileInfo = new FileSystemMetadata
+                {
+                    FullName = "/media/28.Years.Later.2025.1080p.MA.WEBRip.DDP5.1.Atmos.x264.HUN-FULCRUM",
+                    IsDirectory = true
+                },
+                FileSystemChildren = new[]
+                {
+                    new FileSystemMetadata
+                    {
+                        FullName = "/media/28.Years.Later.2025.1080p.MA.WEBRip.DDP5.1.Atmos.x264.HUN-FULCRUM/fulcrum-28.years.later.2025.1080p.webrip.ma.mkv",
+                        Name = "fulcrum-28.years.later.2025.1080p.webrip.ma.mkv"
+                    },
+                    new FileSystemMetadata
+                    {
+                        FullName = "/media/28.Years.Later.2025.1080p.MA.WEBRip.DDP5.1.Atmos.x264.HUN-FULCRUM/Sample",
+                        Name = "Sample",
+                        IsDirectory = true
+                    }
+                }
+            };
+
+            var result = resolver.ResolvePath(args);
+
+            Assert.IsType<Movie>(result);
+        }
+
         private static ItemResolveArgs ArgsForDirectory(string path, Folder parent, CollectionType? collectionType, params FileSystemMetadata[] children)
         {
             return new ItemResolveArgs(
