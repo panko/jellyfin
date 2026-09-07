@@ -36,7 +36,8 @@ namespace Emby.Server.Implementations.Library.Resolvers.Movies
             CollectionType.homevideos,
             CollectionType.musicvideos,
             CollectionType.tvshows,
-            CollectionType.photos
+            CollectionType.photos,
+            CollectionType.mixed
         ];
 
         /// <summary>
@@ -113,7 +114,7 @@ namespace Emby.Server.Implementations.Library.Resolvers.Movies
                     movie = FindMovie<Video>(args, args.Path, args.Parent, files, DirectoryService, collectionType, false);
                 }
 
-                if (collectionType is null)
+                if (collectionType is null || collectionType == CollectionType.mixed)
                 {
                     // Owned items will be caught by the video extra resolver
                     if (args.Parent is null)
@@ -163,6 +164,15 @@ namespace Emby.Server.Implementations.Library.Resolvers.Movies
             else if (collectionType == CollectionType.homevideos || collectionType == CollectionType.photos)
             {
                 item = ResolveVideo<Video>(args, false);
+            }
+            else if (collectionType == CollectionType.mixed)
+            {
+                if (args.HasParent<Series>())
+                {
+                    return null;
+                }
+
+                item = ResolveVideo<Movie>(args, true);
             }
             else if (collectionType is null)
             {
@@ -227,6 +237,39 @@ namespace Emby.Server.Implementations.Library.Resolvers.Movies
             if (collectionType == CollectionType.movies)
             {
                 return ResolveVideos<Movie>(parent, files, true, collectionType, true);
+            }
+
+            if (collectionType == CollectionType.mixed)
+            {
+                // In a mixed library, only batch-resolve files that are NOT episodes.
+                // Episode files are left for individual resolution so EpisodeResolver
+                // can classify them (important for files under a Series, and for loose
+                // episode files at the library root).
+                var episodeFiles = new List<FileSystemMetadata>();
+                var movieFiles = new List<FileSystemMetadata>();
+                var episodeResolver = new Naming.TV.EpisodeResolver(NamingOptions);
+                foreach (var file in files)
+                {
+                    if (!file.IsDirectory)
+                    {
+                        var episodeInfo = episodeResolver.Resolve(file.FullName, false, true, false, fillExtendedInfo: false);
+                        if (episodeInfo is not null && episodeInfo.EpisodeNumber.HasValue)
+                        {
+                            episodeFiles.Add(file);
+                            continue;
+                        }
+                    }
+
+                    movieFiles.Add(file);
+                }
+
+                var mixedResult = ResolveVideos<Movie>(parent, movieFiles, false, collectionType, true);
+                if (mixedResult is not null)
+                {
+                    mixedResult.ExtraFiles.AddRange(episodeFiles);
+                }
+
+                return mixedResult;
             }
 
             if (collectionType == CollectionType.tvshows)
