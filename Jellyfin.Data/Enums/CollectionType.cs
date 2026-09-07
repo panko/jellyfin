@@ -74,6 +74,11 @@ public enum CollectionType
     folders = 12,
 
     /// <summary>
+    /// Mixed Movies and TV Shows collection.
+    /// </summary>
+    mixed = 13,
+
+    /// <summary>
     /// Tv show series collection.
     /// </summary>
     [OpenApiIgnoreEnum]
