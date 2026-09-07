@@ -79,7 +79,7 @@ namespace Emby.Server.Implementations.Library.Resolvers.TV
                         };
                     }
                 }
-                else if (collectionType is null)
+                else if (collectionType is null || collectionType == CollectionType.mixed)
                 {
                     if (args.ContainsFileSystemEntryByName("tvshow.nfo"))
                     {
