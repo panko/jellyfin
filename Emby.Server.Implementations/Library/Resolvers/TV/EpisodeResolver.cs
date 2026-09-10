@@ -49,46 +49,60 @@ namespace Emby.Server.Implementations.Library.Resolvers.TV
 
             var season = parent as Season ?? parent.GetParents().OfType<Season>().FirstOrDefault();
 
+            var collectionType = args.GetCollectionType();
+
             // If the parent is a Season or Series and the parent is not an extras folder, then this is an Episode if the VideoResolver returns something
             // Also handle flat tv folders
-            if (season is not null
-                || args.GetCollectionType() == CollectionType.tvshows
-                || args.HasParent<Series>())
+            var isTv = season is not null
+                || collectionType == CollectionType.tvshows
+                || args.HasParent<Series>();
+
+            // In a mixed library there is no parent Series or Season to rely on, so only
+            // classify a file as an episode when the file name actually parses as one.
+            var isMixedEpisode = false;
+            if (!isTv && collectionType == CollectionType.mixed)
             {
-                var episode = ResolveVideo<Episode>(args, false);
-
-                // Ignore extras
-                if (episode is null || episode.ExtraType is not null)
-                {
-                    return null;
-                }
-
-                var series = parent as Series ?? parent.GetParents().OfType<Series>().FirstOrDefault();
-
-                if (series is not null)
-                {
-                    episode.SeriesId = series.Id;
-                    episode.SeriesName = series.Name;
-                }
-
-                if (season is not null)
-                {
-                    episode.SeasonId = season.Id;
-                    episode.SeasonName = season.Name;
-                }
-
-                // Assume season 1 if there's no season folder and a season number could not be determined
-                if (season is null && !episode.ParentIndexNumber.HasValue && (episode.IndexNumber.HasValue || episode.PremiereDate.HasValue))
-                {
-                    episode.ParentIndexNumber = 1;
-                }
-
-                SetProviderIdFromPath(episode, args.Path);
-
-                return episode;
+                var episodeInfo = new Naming.TV.EpisodeResolver(NamingOptions)
+                    .Resolve(args.Path, false, true, false, fillExtendedInfo: false);
+                isMixedEpisode = episodeInfo is not null && episodeInfo.EpisodeNumber.HasValue;
             }
 
-            return null;
+            if (!isTv && !isMixedEpisode)
+            {
+                return null;
+            }
+
+            var episode = ResolveVideo<Episode>(args, false);
+
+            // Ignore extras
+            if (episode is null || episode.ExtraType is not null)
+            {
+                return null;
+            }
+
+            var series = parent as Series ?? parent.GetParents().OfType<Series>().FirstOrDefault();
+
+            if (series is not null)
+            {
+                episode.SeriesId = series.Id;
+                episode.SeriesName = series.Name;
+            }
+
+            if (season is not null)
+            {
+                episode.SeasonId = season.Id;
+                episode.SeasonName = season.Name;
+            }
+
+            // Assume season 1 if there's no season folder and a season number could not be determined
+            if (season is null && !episode.ParentIndexNumber.HasValue && (episode.IndexNumber.HasValue || episode.PremiereDate.HasValue))
+            {
+                episode.ParentIndexNumber = 1;
+            }
+
+            SetProviderIdFromPath(episode, args.Path);
+
+            return episode;
         }
 
         /// <summary>
